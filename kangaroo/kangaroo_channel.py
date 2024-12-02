@@ -2,7 +2,7 @@ import logging
 import multimethod
 
 
-class KanagarooChannel():
+class KangarooChannel():
     def __init__(self, kangaroo_serial, name):
         self.logger = logging.getLogger('KangarooChannel')
         logging.basicConfig(filename='kangarooChannel.log', level=logging.DEBUG)
