@@ -9,7 +9,8 @@ import threading
 from smbus2 import SMBus
 
 from ads1115.ads1115 import ADS1115
-from line_follower.line_sensor import LineSensor
+from line_sensor.line_sensor import LineSensor
+from movement.line_follower import LineFollower
 from communication.heartbeat.client import Client_Heartbeat
 from communication.heartbeat.heartbeat_message import HeartbeatMessage
 from queue import Queue
@@ -20,9 +21,13 @@ from kangaroo.kangaroo_serial import KangarooSerial
 
 in_heartbeat_message = Queue()
 mother = Server()
-SENSOR_SPACING = 13
-SENSOR_WIDTH = 17
-SENSOR_Y_DISTANCE = 88
+WHEEL_RADIUS = 67.3 # mm
+SYSTEM_RADIUS = 124.5 # mm
+ENCODER_RESOLUTION = 20 # ticks/rev
+MOTOR_RATIO = 100
+SENSOR_SPACING = 13 # mm
+SENSOR_WIDTH = 17 # mm
+SENSOR_Y_DISTANCE = 88 # mm
 
 def main():
     logger = logging.getLogger('pyIzzy')
@@ -35,24 +40,30 @@ def main():
     #heartbeat_thread.start()
     #heartbeat_thread.join()
 
-    # Start obstacle detection
-
-    # Start line sensors using ADS1115 interface board
-    i2c = SMBus(1)
-    ads1115_address = 0x49
-    ads1115 = ADS1115
-    line_sensor_left = LineSensor(32000, 2, "DistanceSensor-A2", ads1115) # left
-    line_sensor_right = LineSensor(32000, 0, "DistanceSensor-A0", ads1115) # right
-    line_sensors = [line_sensor_left, line_sensor_right, SENSOR_SPACING, SENSOR_WIDTH, SENSOR_Y_DISTANCE]
-
     # Connect to motion controller
     # Open serial connection to Kangaroo Backpack
     drive_controller = KangarooSerial()
     drive_channel = KangarooChannel(drive_controller, 'D')
     turn_channel = KangarooChannel(drive_controller, 'T')
 
-    # Follow line: (traceback through movement/lineFollowing/IZZYMoveLineFollow.java
+    # Start line sensors using ADS1115 interface board
+    i2c = SMBus(1)
+    ads1115_address = 0x49
+    ads1115 = ADS1115(i2c, ads1115_address)
+    line_sensor_left = LineSensor(32000, 2, "DistanceSensor-A2", ads1115) # left
+    line_sensor_right = LineSensor(32000, 0, "DistanceSensor-A0", ads1115) # right
+    line_sensors = [line_sensor_left, line_sensor_right, SENSOR_SPACING, SENSOR_WIDTH, SENSOR_Y_DISTANCE]
 
+    # Follow line
+    line_follower = LineFollower()
+    line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+    line_follower.pid_setup(line_sensors, 1, 0, 0)
+    line_follower.set_channels(drive_channel, turn_channel)
+    line_follower.update_speed(100)
+    line_follower.start_following()
+    line_follower.follow_line()
+
+    # Start obstacle detection
 
 def incoming_heartbeat(incoming_message):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
