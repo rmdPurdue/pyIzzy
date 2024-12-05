@@ -6,6 +6,10 @@ class LineFollower(DriveMovement):
     following_stopped = False
     moving = False
     new_speed = 0
+
+    def __init__(self, x=0, y=0, z=0):
+        super().__init__(x, y, z)
+
     def pid_setup(self, sensors, kp = 1, ki = 0, kd = 0):
         self.pid = PID(sensors, kp, ki, kd)
 
@@ -15,8 +19,7 @@ class LineFollower(DriveMovement):
         else:
             self.pid.adjust_error_analog()
             self.pid.calculate_PID()
-            self.set_speed(self.new_speed)
-            self.increase_turn_angle((-self.pid.get_error_angle() + 0.5), 90)
+            self.increase_turn_angle((-self.pid.get_error_angle() + 0.5), self.current_speed)
 
     def is_line_detected(self):
         return self.pid.is_line_detected()

@@ -2,11 +2,14 @@
 import serial
 import logging
 
+
 class KangarooSerial:
+    KANGAROO_PORT = '/dev/ttyS0'
+
     def __init__(self):
         self.logger = logging.getLogger('KangarooSerial')
         logging.basicConfig(filename='kangarooSerial.log', level=logging.DEBUG)
-        self.my_serial = serial.Serial('/dev/ttyS0',
+        self.my_serial = serial.Serial(self.KANGAROO_PORT,
                                        timeout=0,
                                        baudrate=9600,
                                        parity=serial.PARITY_NONE,
@@ -22,10 +25,10 @@ class KangarooSerial:
         self.my_serial.close()
 
     def write(self, channel, command):
-        if(self.my_serial.is_open):
+        if self.my_serial.is_open:
             command_to_send = channel.get_name() + "," + command
             self.logger.info('Sending serial command: ' + command_to_send +
-                         " as " + command_to_send.encode)
+                             " as " + command_to_send.encode)
             self.my_serial.write(command_to_send.encode())
             self.logger.info('Send complete.')
         else:
