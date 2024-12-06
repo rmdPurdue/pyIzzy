@@ -5,6 +5,7 @@ class LineSensor():
     max_reading = 17000
     reading = 0
     slope = 0
+
     def __init__(self, threshold, pin, name, ads1115):
         self.threshold = threshold
         self.pin = pin

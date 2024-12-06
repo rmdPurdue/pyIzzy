@@ -5,12 +5,12 @@ from movement.drive_movement import DriveMovement
 class LineFollower(DriveMovement):
     following_stopped = False
     moving = False
-    new_speed = 0
 
     def __init__(self, x=0, y=0, z=0):
         super().__init__(x, y, z)
+        self.pid = None
 
-    def pid_setup(self, sensors, kp = 1, ki = 0, kd = 0):
+    def pid_setup(self, sensors, kp=1, ki=0, kd=0):
         self.pid = PID(sensors, kp, ki, kd)
 
     def follow_line(self):
@@ -34,7 +34,7 @@ class LineFollower(DriveMovement):
         return not self.following_stopped
 
     def update_speed(self, speed):
-        self.new_speed = speed
+        self.current_speed = speed
 
     def get_moving_state(self):
         return self.moving

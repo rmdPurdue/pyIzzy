@@ -1,10 +1,18 @@
 import math
 
+
 class DriveMovement():
     current_speed = 0
     current_angle = 0
     current_position = {"x": 0, "y": 0, "z": 0}
-    def __init__(self, x = 0, y = 0, z = 0):
+
+    def __init__(self, x=0, y=0, z=0):
+        self.turn_channel = None
+        self.drive_channel = None
+        self.motor_ratio = None
+        self.encoder_resolution = None
+        self.system_radius = None
+        self.wheel_radius = None
         self.home = {"x": x, "y": y, "z": z}
         self.current_position = {"x": x, "y": y, "z": z}
         self.angle = 0
@@ -40,14 +48,14 @@ class DriveMovement():
     def update_angle(self, angle):
         self.current_angle = angle
 
-    def turn(self, target_angle, speed = 0):
+    def turn(self, target_angle, speed=0):
         angle = self.system_radius * 360 * self.encoder_resolution
         if target_angle == 0: angle = 0
         else: target_angle = angle / (target_angle * self.wheel_radius)
         self.turn_channel.P(target_angle, speed)
         self.current_angle = target_angle
 
-    def increase_turn_angle(self, angle_increase, speed = 0):
+    def increase_turn_angle(self, angle_increase, speed=0):
         angle = self.system_radius * 360 * self.encoder_resolution
         if angle_increase == 0:
             target_angle = self.current_angle
@@ -58,41 +66,42 @@ class DriveMovement():
         self.turn_channel.P(target_angle, speed)
         self.current_angle = target_angle
 
-    def set_speed(self, speed = 0):
+    def set_speed(self, speed=0):
         if self.current_speed == speed: pass
         else:
             self.current_speed = speed
             self.drive_channel.S(speed)
 
-    def increase_speed(self, speed = 0):
+    def increase_speed(self, speed=0):
         if self.current_speed == speed: pass
         else:
             self.current_speed += speed
             self.drive_channel.S(self.current_speed)
 
-    def move(self, distance, speed = 0):
+    def move(self, distance, speed=0):
         self.drive_channel.P(distance)
         self.drive_channel.S(speed)
+
     def soft_estop(self):
         self.drive_channel.power_down()
         self.turn_channel.power_down()
         self.current_speed = 0
 
     def simple_move(self, target_position, angle_direction):
-        if self.position["x"] == target_position["x"] and self.position["y"] != target_position["y"]:
+        if self.current_position["x"] == target_position["x"] and self.current_position["y"] != target_position["y"]:
             cw_angle = 90
             ccw_angle = 270
         else:
-            tan_angle = math.tan(self.position["y"] / (self.position["x"] * 360 / (2 * math.pi)))
-            if target_position["x"] > self.position["x"]:
-                if target_position["y"] > self.position["y"]:
+            tan_angle = math.tan(self.current_position["y"] / (self.current_position["x"] * 360 / (2 * math.pi)))
+            if target_position["x"] > self.current_position["x"]:
+                if target_position["y"] > self.current_position["y"]:
                     ccw_angle = tan_angle
                     cw_angle = 360 - tan_angle
                 else:
                     ccw_angle = 360 - tan_angle
                     cw_angle = tan_angle
             else:
-                if target_position["y"] > self.position["y"]:
+                if target_position["y"] > self.current_position["y"]:
                     ccw_angle = 180 - tan_angle
                     cw_angle = 180 + tan_angle
                 else:
@@ -107,7 +116,7 @@ class DriveMovement():
                 self.turn(-cw_angle)
             else:
                 self.turn(ccw_angle)
-        distance = math.sqrt(pow(self.position["x"], 2) + pow(self.position["y"], 2))
+        distance = math.sqrt(pow(self.current_position["x"], 2) + pow(self.current_position["y"], 2))
         self.move(distance, 10)
         self.update_coordinates(target_position)
 
