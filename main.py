@@ -26,8 +26,10 @@ from pythonosc.osc_server import AsyncIOOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import asyncio
 
-in_heartbeat_message = Queue()
-mother = Server()
+from movement.drive_movement import DriveMovement
+
+# in_heartbeat_message = Queue()
+# mother = Server()
 WHEEL_RADIUS = 67.3  # mm
 SYSTEM_RADIUS = 124.5  # mm
 ENCODER_RESOLUTION = 20  # ticks/rev
@@ -37,7 +39,6 @@ SENSOR_WIDTH = 17  # mm
 SENSOR_Y_DISTANCE = 88  # mm
 MY_IP_ADDRESS = "127.0.0.1"  # IZZY's IP; don't use local host
 MOTHER_IP_ADDRESS = "192.168.1.1" # Mother's IP
-
 
 # Start logger
 logger = logging.getLogger('pyIzzy')
@@ -65,11 +66,18 @@ line_follower.set_channels(drive_channel, turn_channel)
 line_follower.update_speed(100)
 line_follower.start_following()
 
+"""
 # Initialize Obstacle Responder
 obstacle_responder = ObstacleResponder()
+"""
 
 # Initialize OSC client to talk to Mother
 izzy = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
+
+# movement test
+mover = DriveMovement()
+mover.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+mover.set_channels(drive_channel, turn_channel)
 
 
 # OSC Message Callback functions
@@ -142,6 +150,9 @@ osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
 async def loop():
     while True:
         running = True
+        print("Moving")
+
+        mover.move(10, 100)
 
         # Heartbeat thread
         # heartbeat_thread = threading.Thread(target=heartbeat, args=(in_heartbeat_message, "192.168.1.10",8080))
@@ -151,32 +162,32 @@ async def loop():
         # Start listening for command messages
 
         # Follow line
-        line_follower.follow_line()
+        # line_follower.follow_line()
 
         # Start obstacle detection
-        obstacle_responder.start_avoiding()
+        # obstacle_responder.start_avoiding()
 
         # Send data update to Mother
-        message = OscMessageBuilder(address="/Mother/Status")
-        message.add_arg(line_follower.current_speed)
-        message.add_arg(line_follower.pid.get_pid_value())
-        message.add_arg(line_follower.pid.get_error_angle())
-        message.add_arg(line_follower.pid.get_kp())
-        message.add_arg(line_follower.pid.get_ki())
-        message.add_arg(line_follower.pid.get_kd())
-        message.add_arg(line_follower.get_moving_state())
-        message.add_arg(line_sensor_left.get_reading())
-        message.add_arg(0) # we have no center sensor any longer
-        message.add_arg(line_sensor_right.get_reading())
-        message.add_arg(line_sensor_left.get_threshold())
-        message.add_arg(0) # we have no center sensor any longer
-        message.add_arg(line_sensor_right.get_threshold())
-        message.add_arg(drive_channel.get_p())
-        message.add_arg(drive_channel.get_s())
-        message.add_arg(turn_channel.get_p())
-        message.add_arg(turn_channel.get_s())
-        message = message.build()
-        izzy.send(message)
+        # message = OscMessageBuilder(address="/Mother/Status")
+        # message.add_arg(line_follower.current_speed)
+        # message.add_arg(line_follower.pid.get_pid_value())
+        # message.add_arg(line_follower.pid.get_error_angle())
+        # message.add_arg(line_follower.pid.get_kp())
+        # message.add_arg(line_follower.pid.get_ki())
+        # message.add_arg(line_follower.pid.get_kd())
+        # message.add_arg(line_follower.get_moving_state())
+        # message.add_arg(line_sensor_left.get_reading())
+        # message.add_arg(0) # we have no center sensor any longer
+        # message.add_arg(line_sensor_right.get_reading())
+        # message.add_arg(line_sensor_left.get_threshold())
+        # message.add_arg(0) # we have no center sensor any longer
+        # message.add_arg(line_sensor_right.get_threshold())
+        # message.add_arg(drive_channel.get_p())
+        # message.add_arg(drive_channel.get_s())
+        # message.add_arg(turn_channel.get_p())
+        # message.add_arg(turn_channel.get_s())
+        # message = message.build()
+        # izzy.send(message)
 
         await asyncio.sleep(0.2)  # sleep for a tenth of a second to let the OSC server listen for messages.
 
@@ -192,6 +203,7 @@ async def init_main():
     transport.close()
 
 
+"""
 def incoming_heartbeat(incoming_message):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(("", Ports.UDP_RECEIVE_PORT.value))
@@ -221,7 +233,7 @@ def heartbeat(incoming_message, ipaddress, port):
     while True:
         beat.send_beat(message)
         time.sleep(2)
-
+"""
 
 if __name__ == '__main__':
     asyncio.run(init_main())

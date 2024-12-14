@@ -4,7 +4,7 @@ import logging
 
 
 class KangarooSerial:
-    KANGAROO_PORT = '/dev/ttyS0'
+    KANGAROO_PORT = '/dev/serial0'
 
     def __init__(self):
         self.logger = logging.getLogger('KangarooSerial')
@@ -26,9 +26,8 @@ class KangarooSerial:
 
     def write(self, channel, command):
         if self.my_serial.is_open:
-            command_to_send = channel.get_name() + "," + command
-            self.logger.info('Sending serial command: ' + command_to_send +
-                             " as " + command_to_send.encode)
+            command_to_send = channel + "," + command
+            self.logger.info(f'Sending serial command: {command_to_send} as {command_to_send.encode()}')
             self.my_serial.write(command_to_send.encode())
             self.logger.info('Send complete.')
         else:

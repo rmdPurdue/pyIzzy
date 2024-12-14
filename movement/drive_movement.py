@@ -30,29 +30,11 @@ class DriveMovement():
         self.turn_channel.start()
         self.drive_channel.units("1 rotation = 512 lines")
 
-    def get_drive_position(self):
-        return self.drive_channel.getP()
-
-    def get_drive_speed(self):
-        return self.drive_channel.getS()
-
-    def get_coordinates(self):
-        return self.current_position
-
-    def get_angle(self):
-        return self.angle
-
-    def update_coordinates(self, coords):
-        self.current_position = coords
-
-    def update_angle(self, angle):
-        self.current_angle = angle
-
     def turn(self, target_angle, speed=0):
         angle = self.system_radius * 360 * self.encoder_resolution
         if target_angle == 0: angle = 0
         else: target_angle = angle / (target_angle * self.wheel_radius)
-        self.turn_channel.P(target_angle, speed)
+        self.turn_channel.p(target_angle, speed)
         self.current_angle = target_angle
 
     def increase_turn_angle(self, angle_increase, speed=0):
@@ -63,24 +45,24 @@ class DriveMovement():
             target_angle = angle / ((self.current_angle + angle_increase) * self.wheel_radius)
         else:
             target_angle = angle / ((self.current_angle - angle_increase) * self.wheel_radius)
-        self.turn_channel.P(target_angle, speed)
+        self.turn_channel.p(target_angle, speed)
         self.current_angle = target_angle
 
     def set_speed(self, speed=0):
         if self.current_speed == speed: pass
         else:
             self.current_speed = speed
-            self.drive_channel.S(speed)
+            self.drive_channel.s(speed)
 
     def increase_speed(self, speed=0):
         if self.current_speed == speed: pass
         else:
             self.current_speed += speed
-            self.drive_channel.S(self.current_speed)
+            self.drive_channel.s(self.current_speed)
 
     def move(self, distance, speed=0):
-        self.drive_channel.P(distance)
-        self.drive_channel.S(speed)
+        self.drive_channel.p(distance)
+        self.drive_channel.s(speed)
 
     def soft_estop(self):
         self.drive_channel.power_down()
@@ -118,7 +100,7 @@ class DriveMovement():
                 self.turn(ccw_angle)
         distance = math.sqrt(pow(self.current_position["x"], 2) + pow(self.current_position["y"], 2))
         self.move(distance, 10)
-        self.update_coordinates(target_position)
+        self.current_position = target_position
 
     def reset_drive(self):
         self.drive_channel.power_down()
@@ -132,3 +114,26 @@ class DriveMovement():
         self.drive_channel.units(drive_message)
         turn_message = f"360 degrees = {lines_for_turn + 0.5} lines"
         self.turn_channel.units(turn_message)
+
+
+"""
+    Getters and setters should not be necessary in Python; set the values directly.
+    
+    def get_drive_position(self):
+        return self.drive_channel.getP()
+
+    def get_drive_speed(self):
+        return self.drive_channel.getS()
+
+    def get_coordinates(self):
+        return self.current_position
+
+    def get_angle(self):
+        return self.angle
+
+    def update_coordinates(self, coords):
+        self.current_position = coords
+
+    def update_angle(self, angle):
+        self.current_angle = angle
+"""

@@ -1,6 +1,5 @@
-class LineSensor():
-
-    SENSOR_OFFSET = 2.3 # Distance (in cm) from IZZY center to the middle of sensor)
+class LineSensor:
+    SENSOR_OFFSET = 2.3  # Distance (in cm) from IZZY center to the middle of sensor)
     min_reading = 6000
     max_reading = 17000
     reading = 0
@@ -20,10 +19,14 @@ class LineSensor():
         self.threshold = threshold
 
     def get_reading(self):
-        if self.pin == 0: self.reading = self.ads1115.get_A0()
-        elif self.pin == 1: self.reading = self.ads1115.get_A1()
-        elif self.pin == 2: self.reading = self.ads1115.get_A2()
-        elif self.pin == 3: self.reading = self.ads1115.get_A3()
+        if self.pin == 0:
+            self.reading = self.ads1115.get_a0()
+        elif self.pin == 1:
+            self.reading = self.ads1115.get_a1()
+        elif self.pin == 2:
+            self.reading = self.ads1115.get_a2()
+        elif self.pin == 3:
+            self.reading = self.ads1115.get_a3()
         return self.reading * 10000
 
     def get_state(self):

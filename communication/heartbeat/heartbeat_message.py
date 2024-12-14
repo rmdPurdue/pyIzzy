@@ -35,14 +35,14 @@ class HeartbeatMessage:
         self.length = 47 + data.length
 
     def process_packet(self, raw_data):
-        if(raw_data[0] == self.preamble):
-            if(raw_data[1:12] == self.msg_id):
-                if(raw_data.length == int.from_bytes(raw_data[12:14], "big")):
+        if raw_data[0] == self.preamble:
+            if raw_data[1:12] == self.msg_id:
+                if raw_data.length == int.from_bytes(raw_data[12:14], "big"):
                     self.msg_length = int.from_bytes(raw_data[12:14], "big")
                     self.sender_id = int.from_bytes(raw_data[14:30], "big")
                     self.receiver_id = int.from_bytes(raw_data[30:46], "big")
                     self.message_type = raw_data[46]
-                    if(raw_data.length > 47):
+                    if raw_data.length > 47:
                         self.data = raw_data[47:raw_data.length]
                     else:
                         self.data = None
@@ -50,5 +50,3 @@ class HeartbeatMessage:
                 else: return False
             else: return False
         else: return False
-
-    def get_message(self):
