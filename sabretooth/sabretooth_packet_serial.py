@@ -5,15 +5,18 @@ import logging
 class SabertoothPacketSerial:
     """A class for sending packet serial commands to a Sabertooth 2x12.
 
-    Hardware address is set on dipswitches on the Sabertooth. Address range is 128 - 135.
-    Serial messages follow 8N1 protocol (8 data bytes, no parity bits, one stop bit). Default
-    baud rate is 9600, but can be changed using the method below. Note that changed baud rates
-    will take effect after a power cycle of the Sabertooth, and that once set they cannot be
-    reset to factory defaults; they can only be changed by sending a change baud rate command.
+    Hardware address is set on dipswitches on the Sabertooth. Address range
+    is 128 - 135. Serial messages follow 8N1 protocol (8 data bytes,
+    no parity bits, one stop bit). Default baud rate is 9600, but can be
+    changed using the method below. Note that changed baud rates will take
+    effect after a power cycle of the Sabertooth, and that once set they
+    cannot be reset to factory defaults; they can only be changed by sending
+    a change baud rate command.
 
-    The packet format for communicating with the Sabertooth comprises an address byte, a command
-    byte, a data byte, and a 7-bit checksum. Address bytes are all greater than 128; all subsequent
-    bytes are less than 127. This allows multiple devices to share the same serial bus.
+    The packet format for communicating with the Sabertooth comprises an
+    address byte, a command byte, a data byte, and a 7-bit checksum.
+    Address bytes are all greater than 128; all subsequent bytes are less
+    than 127. This allows multiple devices to share the same serial bus.
 
     Dip switch settings
     -------------------
@@ -30,29 +33,100 @@ class SabertoothPacketSerial:
     Attributes
     ----------
     sabertooth_port: str
-        holds the string for the Linux path to the UART GPIO pins. Default set to "/dev/ttyS0."
+        holds the string for the Linux path to the UART GPIO pins. Default
+        set to "/dev/ttyS0."
 
     min_voltage: int
         the minimum voltage for the battery powering the Sabertooth.
-        Used to set the low threshold of the battery; when set on the Sabertooth,
-        if the battery voltage drops below this, outputs will shut down.
-        Can be set to values between 0 and 120: 0 = 6v; values step in 0.2V increments (such that
-        120 = 30V). Default is 15 (9V for an 11V lipo battery).
+        Used to set the low threshold of the battery; when set on the
+        Sabertooth, if the battery voltage drops below this, outputs will
+        shut down. Can be set to values between 0 and 120: 0 = 6v; values
+        step in 0.2V increments (such that 120 = 30V). Default is 15 (9V for
+        an 11V lipo battery).
 
     max_voltage: int
-        the maximum voltage for the battery powering the Sabertooth. Because the Sabertooth
-        incorporates regenerative braking, input voltage will increase when slowing the motor.
-        Hardware default is 30V; can be set to a range between 0V and 25V using the formula:
-        Value = Desired Volts * 5.12. Default is 56 (for an 11V lipo battery).
+        the maximum voltage for the battery powering the Sabertooth. Because
+        the Sabertooth incorporates regenerative braking, input voltage will
+        increase when slowing the motor. Hardware default is 30V; can be set
+        to a range between 0V and 25V using the formula: Value = Desired
+        Volts * 5.12. Default is 56 (for an 11V lipo battery).
 
     address: int
         the hardware address of the Sabertooth. Default set to 128.
 
+    Static Functions
+    ----------------
+    calculate_checksum(address: int, command: int, value: int)
+        calculates the checksum for a given packet
+
+    map(source: int, from_a: int, from_b: int, to_a: int, to_b: int) -> int
+        Maps a value (source) from range from_a to to_a to the range from_b to
+        to_b. Returns the remapped value.
+
     Methods
     -------
+    write_message(address: int, command: int, value: int)
+        Sends the sequence of bytes that comprise a command packet.
 
+    set_timeout(timeout: int)
+        Sets the serial timeout for the Sabertooth.
 
+    set_baud(baud: int):
+        Sets the baud rate of the Sabertooth.
 
+    set_ramping(ramp: int) -> float
+        Ramp time is the delay between full forward and full reverse speed.
+        Returns the delay time in seconds.
+
+    set_deadband(deadband: int)
+        Sets the extent of the Sabertooth's deadband: the range of commands
+        close to "stop" that will be interpreted as stop.
+
+    set_min_voltage(voltage: int)
+        Sets the minimum voltage for the battery powering the Sabertooth.
+
+    set_max_voltage(voltage: int)
+        Sets the maximum voltage for the battery powering the Sabertooth.
+
+    motor_1_fwd(speed: int)
+        Used to command motor 1 forward in independent mode.
+
+    motor_1_rev(speed: int)
+        Used to command motor 1 backward in independent mode.
+
+    motor_2_fwd(speed: int)
+        Used to command motor 2 forward in independent mode.
+
+    motor_2_rev(speed: int)
+        Used to command motor 2 backward in independent mode.
+
+    drive_motor_1(speed: int)
+        Used to drive motor 1 either backward or forward, at the cost of
+        resolution of speed.
+
+    drive_motor_2(speed: int)
+        Used to drive motor 2 either backward or forward, at the cost of
+        resolution of speed.
+
+    drive_fwd(speed: int)
+        Used to command vehicle forward in mixed mode.
+
+    drive_rev(speed: int)
+        Used to command vehicle backward in mixed mode.
+
+    turn_right(speed: int)
+        Used to command vehicle to turn right in mixed mode.
+
+    turn_left(speed: int)
+        Used to command vehicle to turn left in mixed mode.
+
+    drive(speed: int)
+        Used to command vehicle forward or backward in mixed mode, at the
+        cost of resolution of speed.
+
+    turn(speed: int)
+        Used to command vehicle to turn right ot left in mixed mode, at the
+        cost of resolution of speed.
     """
 
     sabertooth_port = '/dev/ttyS0'
@@ -144,11 +218,12 @@ class SabertoothPacketSerial:
 
     def set_timeout(self, timeout: int):
         """
-        Sets the serial timeout for the Sabertooth; if it does not receive a serial command within
-        this amount of time, the driver will shut off. Serial timeout is off by default; a value of
-        0 will disable the timeout if it has previously been enabled. Scales at 1 unit per 100ms:
-        10 = 1000ms. This setting is not persistent through a power cycle so must be reset if power
-        is lost or cycled.
+        Sets the serial timeout for the Sabertooth; if it does not receive a
+        serial command within this amount of time, the driver will shut off.
+        Serial timeout is off by default; a value of 0 will disable the
+        timeout if it has previously been enabled. Scales at 1 unit per 100ms:
+        10 = 1000ms. This setting is not persistent through a power cycle so
+        must be reset if power is lost or cycled.
 
         :param timeout: timeout, in tenths of a second (100 ms).
         """
@@ -159,8 +234,9 @@ class SabertoothPacketSerial:
 
     def set_baud(self, baud: int):
         """
-        Sets the baud rate of the Sabertooth. The hardware recognizes four baud rates: 2400, 9600
-        19200, and 38400. Any values other than these will default to 9600. This setting is persistent.
+        Sets the baud rate of the Sabertooth. The hardware recognizes four
+        baud rates: 2400, 9600, 19200, and 38400. Any values other than these
+        will default to 9600. This setting is persistent.
 
         :param baud: a value representing a baud rate, int
         """
@@ -181,9 +257,10 @@ class SabertoothPacketSerial:
 
     def set_ramping(self, ramp: int) -> float:
         """
-        Ramp time is the delay between full forward and full reverse speed. This adjusts or disables
-        ramping. Values between 1 and 10 are FAST RAMP; values between 11 and 20 are SLOW RAMP; values
-        between 21 and 80 are INTERMEDIATE RAMP. FAST RAMPING is a ramp time of 256/(~1000 x value).
+        Ramp time is the delay between full forward and full reverse speed.
+        This adjusts or disables ramping. Values between 1 and 10 are FAST
+        RAMP; values between 11 and 20 are SLOW RAMP; values between 21 and
+        80 are INTERMEDIATE RAMP. FAST RAMPING is a ramp time of 256/(~1000 x value).
         SLOW and INTERMEDIATE RAMPING are a ramp time of 256/[15.25 x (value - 10)].
 
         Valid values are 1 to 80
@@ -207,11 +284,12 @@ class SabertoothPacketSerial:
 
     def set_deadband(self, deadband: int):
         """
-        Sets the extent of the Sabertooth's deadband: the range of commands close to "stop" that
-        will be interpreted as stop. This setting is persistent. Range is 0 to 127 and the formula
-        is as follows: 127 - value < motors off < 128 + value. A value of 3 would shut the motors
-        off with speed commands between 124 (127 - 3) and 131 (128 + 3). A value of 0 resets to
-        default, or 3.
+        Sets the extent of the Sabertooth's deadband: the range of command
+        values close to "stop" that will be interpreted as stop. This setting is
+        persistent. Range is 0 to 127 and the formula is as follows: 127 -
+        value < motors off < 128 + value. A value of 3 would shut the motors
+        off with speed commands between 124 (127 - 3) and 131 (128 + 3). A
+        value of 0 resets to default, or 3.
 
         :param deadband: the offset from values of 127 that will mean stop; int
         """
@@ -222,9 +300,10 @@ class SabertoothPacketSerial:
 
     def set_min_voltage(self, voltage: int):
         """
-        Sets the minimum voltage for the battery powering the Sabertooth. if the battery voltage drops
-        below this, outputs will shut down. Can be set to values between 0 and 120: 0 = 6v; values step
-        in 0.2V increments (such that 120 = 30V).
+        Sets the minimum voltage for the battery powering the Sabertooth. if
+        the battery voltage drops below this, outputs will shut down. Can be
+        set to values between 0 and 120: 0 = 6v; values step in 0.2V
+        increments (such that 120 = 30V).
 
         :param voltage: desired minimum voltage; int
         """
@@ -236,9 +315,10 @@ class SabertoothPacketSerial:
 
     def set_max_voltage(self, voltage: int):
         """
-        Sets the maximum voltage for the battery powering the Sabertooth. Hardware default is 30V;
-        can be set to a range between 0V and 25V using the formula: Value = Desired Volts * 5.12.
-        Default is 56 (for an 11V lipo battery).
+        Sets the maximum voltage for the battery powering the Sabertooth.
+        Hardware default is 30V; can be set to a range between 0V and 25V
+        using the formula: Value = Desired Volts * 5.12. Default is 56 (for
+        an 11V lipo battery).
 
         :param voltage: desired maximum voltage; int
         """
@@ -251,7 +331,8 @@ class SabertoothPacketSerial:
 
     def motor_1_fwd(self, speed: int):
         """
-        Used to command motor 1 forward in independent mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command motor 1 forward in independent mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motor, in range 0% - 100%
         """
@@ -262,7 +343,8 @@ class SabertoothPacketSerial:
 
     def motor_1_rev(self, speed: int):
         """
-        Used to command motor 1 backward in independent mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command motor 1 backward in independent mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motor, in range 0% - 100%
         """
@@ -273,7 +355,8 @@ class SabertoothPacketSerial:
 
     def motor_2_fwd(self, speed: int):
         """
-        Used to command motor 2 forward in independent mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command motor 2 forward in independent mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motor, in range 0% - 100%
         """
@@ -284,7 +367,8 @@ class SabertoothPacketSerial:
 
     def motor_2_rev(self, speed: int):
         """
-        Used to command motor 2 backward in independent mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command motor 2 backward in independent mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motor, in range 0% - 100%
         """
@@ -295,8 +379,9 @@ class SabertoothPacketSerial:
 
     def drive_motor_1(self, speed: int):
         """
-        Used to drive motor 1 either backward or forward, at the cost of resolution of speed. Valid data
-        is 0-127; 0 is full reverse, 64 is stop, and 127 is full forward.
+        Used to drive motor 1 either backward or forward, at the cost of
+        resolution of speed. Valid data is 0-127; 0 is full reverse,
+        64 is stop, and 127 is full forward.
 
         :param speed: the speed to set the motor, in range -100% to 100%
         """
@@ -307,8 +392,9 @@ class SabertoothPacketSerial:
 
     def drive_motor_2(self, speed: int):
         """
-        Used to drive motor 2 either backward or forward, at the cost of resolution of speed. Valid data
-        is 0-127; 0 is full reverse, 64 is stop, and 127 is full forward.
+        Used to drive motor 2 either backward or forward, at the cost of
+        resolution of speed. Valid data is 0-127; 0 is full reverse,
+        64 is stop, and 127 is full forward.
 
         :param speed: the speed to set the motor, in range -100% to 100%
         """
@@ -319,7 +405,8 @@ class SabertoothPacketSerial:
 
     def drive_fwd(self, speed: int):
         """
-        Used to command vehicle forward in mixed mode. Valid data is 0 to 127; 0 = off, 127 = full speed.
+        Used to command vehicle forward in mixed mode. Valid data is 0 to
+        127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motors, in range 0% - 100%
         """
@@ -330,7 +417,8 @@ class SabertoothPacketSerial:
 
     def drive_rev(self, speed: int):
         """
-        Used to command vehicle backward in mixed mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command vehicle backward in mixed mode. Valid data is 0-127;
+        0 = off, 127 = full speed.
 
         :param speed: the speed to set the motors, in range 0% - 100%
         """
@@ -341,7 +429,8 @@ class SabertoothPacketSerial:
 
     def turn_right(self, speed: int):
         """
-        Used to command vehicle to turn right in mixed mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command vehicle to turn right in mixed mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motors, in range 0% - 100%
         """
@@ -352,7 +441,8 @@ class SabertoothPacketSerial:
 
     def turn_left(self, speed: int):
         """
-        Used to command vehicle to turn left in mixed mode. Valid data is 0-127; 0 = off, 127 = full speed.
+        Used to command vehicle to turn left in mixed mode. Valid data is
+        0-127; 0 = off, 127 = full speed.
 
         :param speed: the speed to set the motors, in range 0% - 100%
         """
@@ -363,8 +453,9 @@ class SabertoothPacketSerial:
 
     def drive(self, speed: int):
         """
-        Used to command vehicle forward or backward in mixed mode, at the cost of resolution
-        of speed. Valid data is 0-127; 0 is full reverse, 64 is stop, and 127 is full forward.
+        Used to command vehicle forward or backward in mixed mode, at the
+        cost of resolution of speed. Valid data is 0-127; 0 is full reverse,
+        64 is stop, and 127 is full forward.
 
         :param speed: the speed to set the motors, in range -100% to 100%
         """
@@ -375,8 +466,9 @@ class SabertoothPacketSerial:
 
     def turn(self, speed: int):
         """
-        Used to command vehicle to turn right or left in mixed mode, at the cost of resolution
-        of speed. Valid data is 0-127; 0 is full reverse, 64 is stop, and 127 is full forward.
+        Used to command vehicle to turn right or left in mixed mode, at the
+        cost of resolution of speed. Valid data is 0-127; 0 is full reverse,
+        64 is stop, and 127 is full forward.
 
         :param speed: the speed to set the motors, in range -100% to 100%
         """

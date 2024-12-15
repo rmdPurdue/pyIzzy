@@ -1,5 +1,12 @@
 from enum import Enum
+
+
 class Directions(Enum):
+    """
+    An enumeration class for direction values used by the project.
+    Extends class Enum from enum.
+    """
+
     FORWARD = 1
     REVERSE = 2
     CLOCKWISE = 3

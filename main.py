@@ -3,6 +3,7 @@ import logging
 import time
 from typing import Any, List
 
+import serial
 from pythonosc.osc_message_builder import OscMessageBuilder
 from pythonosc.udp_client import SimpleUDPClient
 from smbus2 import SMBus
@@ -17,7 +18,6 @@ from queue import Queue
 from communication.ports import Ports
 from devices.server import Server
 from kangaroo.kangaroo_channel import KangarooChannel
-from kangaroo.kangaroo_serial import KangarooSerial
 from pythonosc.osc_server import AsyncIOOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import asyncio
@@ -26,6 +26,7 @@ from movement.drive_movement import DriveMovement
 
 # in_heartbeat_message = Queue()
 # mother = Server()
+KANGAROO_PORT = "/dev/ttyS0"
 WHEEL_RADIUS = 67.3 / 2  # mm
 SYSTEM_RADIUS = 124.5  # mm
 ENCODER_RESOLUTION = 20  # ticks/rev
@@ -53,7 +54,11 @@ logger.setLevel(10)
 logger.info('Izzy started.')
 
 # Open serial connection to Kangaroo Backpack motion controller
-drive_controller = KangarooSerial()
+drive_controller = serial.Serial(KANGAROO_PORT,
+                                       timeout=0,
+                                       baudrate=9600,
+                                       parity=serial.PARITY_NONE,
+                                       stopbits=serial.STOPBITS_ONE)
 drive_channel = KangarooChannel(drive_controller, 'D')
 logger.info("Created drive channel.")
 turn_channel = KangarooChannel(drive_controller, 'T')

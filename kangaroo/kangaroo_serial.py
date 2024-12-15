@@ -1,10 +1,13 @@
-# Kangaroo Serial Class
 import time
 import serial
 import logging
 
 
 class KangarooSerial:
+    """
+    Based on the Arduino library for the Kangaroo x2 Serial Backpack from
+    Dimension Engineering. Deprecated.
+    """
     KANGAROO_PORT = '/dev/ttyS0'
 
     logger = logging.getLogger(__name__)
@@ -20,7 +23,6 @@ class KangarooSerial:
     log_console_handler.setFormatter(formatter)
     log_file_handler.setFormatter(formatter)
     logger.setLevel(10)
-    logger.info('Izzy started.')
 
     def __init__(self):
         self.my_serial = serial.Serial(self.KANGAROO_PORT,
@@ -29,11 +31,7 @@ class KangarooSerial:
                                        parity=serial.PARITY_NONE,
                                        stopbits=serial.STOPBITS_ONE)
 
-    def is_open(self):
-        return self.my_serial.is_open
 
-    def close(self):
-        self.my_serial.close()
 
     def write(self, channel, command):
         if self.my_serial.is_open:

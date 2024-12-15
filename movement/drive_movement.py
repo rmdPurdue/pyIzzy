@@ -2,6 +2,10 @@ import math
 
 
 class DriveMovement:
+    """
+
+    """
+
     current_speed = 0
     current_angle = 0
     current_position = {"x": 0, "y": 0, "z": 0}

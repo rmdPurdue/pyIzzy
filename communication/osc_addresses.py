@@ -2,6 +2,11 @@ from enum import StrEnum
 
 
 class OSCAddresses(StrEnum):
+    """
+    An enumeration class for OSC address patterns used by the project.
+    Extends class StrEnum from enum.
+    """
+
     FOLLOW_LINE_STATE = '/IZZY/FollowLineState'
     FOLLOW_LINE_SPEED = '/IZZY/FollowLineSpeed'
     FOLLOW_LINE_TUNE = '/IZZY/FollowLineTune'
