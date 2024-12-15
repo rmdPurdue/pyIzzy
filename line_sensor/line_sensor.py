@@ -1,5 +1,5 @@
 class LineSensor:
-    SENSOR_OFFSET = 2.3  # Distance (in cm) from IZZY center to the middle of sensor)
+    SENSOR_OFFSET = 2.3  # Distance (in cm) from IZZY center to the middle of sensor
     min_reading = 6000
     max_reading = 17000
     reading = 0

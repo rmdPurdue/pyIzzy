@@ -1,7 +1,7 @@
 import math
 
 
-class DriveMovement():
+class DriveMovement:
     current_speed = 0
     current_angle = 0
     current_position = {"x": 0, "y": 0, "z": 0}
@@ -29,11 +29,12 @@ class DriveMovement():
         self.drive_channel.start()
         self.turn_channel.start()
         self.drive_channel.units("1 rotation = 512 lines")
+        # self.turn_channel.units("180 degrees = 256 lines")
 
     def turn(self, target_angle, speed=0):
         angle = self.system_radius * 360 * self.encoder_resolution
         if target_angle == 0: angle = 0
-        else: target_angle = angle / (target_angle * self.wheel_radius)
+        else: target_angle = int(angle / (target_angle * self.wheel_radius))
         self.turn_channel.p(target_angle, speed)
         self.current_angle = target_angle
 
@@ -60,9 +61,9 @@ class DriveMovement():
             self.current_speed += speed
             self.drive_channel.s(self.current_speed)
 
-    def move(self, distance, speed=0):
-        self.drive_channel.p(distance)
-        self.drive_channel.s(speed)
+    def move(self, distance, speed=10):
+        self.drive_channel.pi(distance, speed)
+        # self.drive_channel.s(speed)
 
     def soft_estop(self):
         self.drive_channel.power_down()

@@ -1,22 +1,33 @@
 # Kangaroo Serial Class
+import time
 import serial
 import logging
 
 
 class KangarooSerial:
-    KANGAROO_PORT = '/dev/serial0'
+    KANGAROO_PORT = '/dev/ttyS0'
+
+    logger = logging.getLogger(__name__)
+    log_console_handler = logging.StreamHandler()
+    log_file_handler = logging.FileHandler('pyIzzy.log',
+                                           mode="a",
+                                           encoding="utf-8")
+    logger.addHandler(log_console_handler)
+    logger.addHandler(log_file_handler)
+    formatter = logging.Formatter("{asctime} - {levelname} - {message}",
+                                  style="{",
+                                  datefmt="%Y-%m-%d %H:%M")
+    log_console_handler.setFormatter(formatter)
+    log_file_handler.setFormatter(formatter)
+    logger.setLevel(10)
+    logger.info('Izzy started.')
 
     def __init__(self):
-        self.logger = logging.getLogger('KangarooSerial')
-        logging.basicConfig(filename='kangarooSerial.log', level=logging.DEBUG)
         self.my_serial = serial.Serial(self.KANGAROO_PORT,
                                        timeout=0,
                                        baudrate=9600,
                                        parity=serial.PARITY_NONE,
                                        stopbits=serial.STOPBITS_ONE)
-
-    def in_waiting(self):
-        return self.my_serial.in_waiting
 
     def is_open(self):
         return self.my_serial.is_open
@@ -27,8 +38,10 @@ class KangarooSerial:
     def write(self, channel, command):
         if self.my_serial.is_open:
             command_to_send = channel + "," + command
-            self.logger.info(f'Sending serial command: {command_to_send} as {command_to_send.encode()}')
             self.my_serial.write(command_to_send.encode())
-            self.logger.info('Send complete.')
-        else:
-            self.logger.error('Error: port not open.')
+            self.logger.debug(f"Sent {command_to_send} to IZZY.")
+            time.sleep(0.1)
+            if self.my_serial.in_waiting > 0:
+                reply = self.my_serial.read(self.my_serial.in_waiting)
+                self.logger.debug(f"Kangaroo returned: {reply}")
+                return reply.decode()

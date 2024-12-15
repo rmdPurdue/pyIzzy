@@ -1,11 +1,12 @@
 import math
 
 
-class PID():
+class PID:
     pid_value = 0
     error = 0
     error_sum = 0
     previous_error = 0
+
     def __init__(self, sensors, kp = 1, ki = 0, kd = 0):
         self.kp = kp
         self.ki = ki
@@ -51,7 +52,7 @@ class PID():
         self.error -= self.sensors[0].get_slope() * self.sensors[0].get_reading()
         self.error += self.sensors[1].get_slope() * self.sensors[1].get_reading()
 
-    def calculate_PID(self):
+    def calculate_pid(self):
         proportional = self.kp * self.error
         integral = self.ki * self.error_sum
         derivative = self.kd * (self.error - self.previous_error)

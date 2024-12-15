@@ -1,4 +1,4 @@
-from movement.pid import PID
+from line_sensor.pid import PID
 from movement.drive_movement import DriveMovement
 
 
@@ -18,7 +18,7 @@ class LineFollower(DriveMovement):
             pass
         else:
             self.pid.adjust_error_analog()
-            self.pid.calculate_PID()
+            self.pid.calculate_pid()
             self.increase_turn_angle((-self.pid.get_error_angle() + 0.5), self.current_speed)
 
     def is_line_detected(self):

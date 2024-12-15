@@ -1,7 +1,3 @@
-# Heartbeat thread
-# Communication thread
-# Sensor readings thread
-# Movement thread
 import socket
 import logging
 import time
@@ -30,7 +26,7 @@ from movement.drive_movement import DriveMovement
 
 # in_heartbeat_message = Queue()
 # mother = Server()
-WHEEL_RADIUS = 67.3  # mm
+WHEEL_RADIUS = 67.3 / 2  # mm
 SYSTEM_RADIUS = 124.5  # mm
 ENCODER_RESOLUTION = 20  # ticks/rev
 MOTOR_RATIO = 100
@@ -38,17 +34,30 @@ SENSOR_SPACING = 13  # mm
 SENSOR_WIDTH = 17  # mm
 SENSOR_Y_DISTANCE = 88  # mm
 MY_IP_ADDRESS = "127.0.0.1"  # IZZY's IP; don't use local host
-MOTHER_IP_ADDRESS = "192.168.1.1" # Mother's IP
+MOTHER_IP_ADDRESS = "192.168.1.1"  # Mother's IP
 
 # Start logger
-logger = logging.getLogger('pyIzzy')
-logging.basicConfig(filename='pyIzzy.log', level=logging.DEBUG)
+logger = logging.getLogger(__name__)
+log_console_handler = logging.StreamHandler()
+log_file_handler = logging.FileHandler('pyIzzy.log',
+                                       mode="a",
+                                       encoding="utf-8")
+logger.addHandler(log_console_handler)
+logger.addHandler(log_file_handler)
+formatter = logging.Formatter("{asctime} - {levelname} - {message}",
+                              style="{",
+                              datefmt="%Y-%m-%d %H:%M")
+log_console_handler.setFormatter(formatter)
+log_file_handler.setFormatter(formatter)
+logger.setLevel(10)
 logger.info('Izzy started.')
 
 # Open serial connection to Kangaroo Backpack motion controller
 drive_controller = KangarooSerial()
 drive_channel = KangarooChannel(drive_controller, 'D')
+logger.info("Created drive channel.")
 turn_channel = KangarooChannel(drive_controller, 'T')
+logger.info("Created turn channel.")
 
 # Start line sensors using ADS1115 interface board
 i2c = SMBus(1)
@@ -60,11 +69,13 @@ line_sensors = [line_sensor_left, line_sensor_right, SENSOR_SPACING, SENSOR_WIDT
 
 # Initialize Line Follower
 line_follower = LineFollower()
-line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
-line_follower.pid_setup(line_sensors, 1, 0, 0)
-line_follower.set_channels(drive_channel, turn_channel)
-line_follower.update_speed(100)
-line_follower.start_following()
+# logger.info("Created line follower/movement controller.")
+# line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+# line_follower.pid_setup(line_sensors, 1, 0, 0)
+# line_follower.set_channels(drive_channel, turn_channel)
+# logger.info("Set movement channels.")
+# line_follower.update_speed(100)
+# line_follower.start_following()
 
 """
 # Initialize Obstacle Responder
@@ -77,7 +88,10 @@ izzy = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
 # movement test
 mover = DriveMovement()
 mover.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+logger.info("Set movement channels.")
 mover.set_channels(drive_channel, turn_channel)
+logger.info("Sending undetectable turn command to initiate movement controls.")
+mover.turn_channel.p(1)
 
 
 # OSC Message Callback functions
@@ -148,11 +162,11 @@ osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
 
 
 async def loop():
+    logger.debug("Send move command, 20 rotations at speed 20.")
+    mover.move(2, 20)
+
     while True:
         running = True
-        print("Moving")
-
-        mover.move(10, 100)
 
         # Heartbeat thread
         # heartbeat_thread = threading.Thread(target=heartbeat, args=(in_heartbeat_message, "192.168.1.10",8080))
