@@ -3,7 +3,7 @@
 from rplidar import RPLidar
 import time
 import numpy
-from movement.drive_movement import DriveMovement
+from source.movement.drive_movement import DriveMovement
 
 
 class ObstacleResponder(DriveMovement):
