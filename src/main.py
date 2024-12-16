@@ -1,33 +1,36 @@
 import logging
 from typing import Any, List
 
+import ADS1x15
 import serial
 from pythonosc.udp_client import SimpleUDPClient
-from smbus2 import SMBus
-from source.ads1115.ads1115 import ADS1115
-from source.communication.osc_addresses import OSCAddresses
-from source.line_sensor.line_sensor import LineSensor
-from source.line_sensor.line_follower import LineFollower
-from source.communication.ports import Ports
-from source.kangaroo.kangaroo_channel import KangarooChannel
+from src.communication.osc_addresses import OSCAddresses
+from src.devices.client import Izzy
+from src.line_sensor.analog_input import AnalogIn
+from src.line_sensor.line_sensor import LineSensor
+from src.line_sensor.line_follower import LineFollower
+from src.communication.ports import Ports
+from src.kangaroo.kangaroo_channel import KangarooChannel
 from pythonosc.osc_server import AsyncIOOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import asyncio
 
-from source.movement.drive_movement import DriveMovement
+from src.line_sensor.sensor_array import SensorArray
+from src.movement.drive_movement import DriveMovement
 
 # in_heartbeat_message = Queue()
 # mother = Server()
 KANGAROO_PORT = "/dev/ttyS0"
-WHEEL_RADIUS = 67.3 / 2  # mm
-SYSTEM_RADIUS = 124.5  # mm
-ENCODER_RESOLUTION = 20  # ticks/rev
-MOTOR_RATIO = 100
-SENSOR_SPACING = 13  # mm
-SENSOR_WIDTH = 17  # mm
-SENSOR_Y_DISTANCE = 88  # mm
+physical_details = {"wheel radius": 67.3 / 2,
+                    "system radius": 124.5,
+                    "sensor y offset": 88,
+                    "encoder resolution": 20,
+                    "motor ratio": 100,
+                    }
 MY_IP_ADDRESS = "127.0.0.1"  # IZZY's IP; don't use local host
 MOTHER_IP_ADDRESS = "192.168.1.1"  # Mother's IP
+ads1115_address = 0x49
+izzy = Izzy()
 
 # Start logger
 logger = logging.getLogger(__name__)
@@ -47,27 +50,34 @@ logger.info('Izzy started.')
 
 # Open serial connection to Kangaroo Backpack motion controller
 drive_controller = serial.Serial(KANGAROO_PORT,
-                                       timeout=0,
-                                       baudrate=9600,
-                                       parity=serial.PARITY_NONE,
-                                       stopbits=serial.STOPBITS_ONE)
+                                 timeout=0,
+                                 baudrate=9600,
+                                 parity=serial.PARITY_NONE,
+                                 stopbits=serial.STOPBITS_ONE)
 drive_channel = KangarooChannel(drive_controller, 'D')
 logger.info("Created drive channel.")
 turn_channel = KangarooChannel(drive_controller, 'T')
 logger.info("Created turn channel.")
 
 # Start line sensors using ADS1115 interface board
-i2c = SMBus(1)
-ads1115_address = 0x49
-ads1115 = ADS1115(i2c, ads1115_address)
-line_sensor_left = LineSensor(32000, 2, "DistanceSensor-A2", ads1115)  # left
-line_sensor_right = LineSensor(32000, 0, "DistanceSensor-A0", ads1115)  # right
-line_sensors = [line_sensor_left, line_sensor_right, SENSOR_SPACING, SENSOR_WIDTH, SENSOR_Y_DISTANCE]
+ads1115 = ADS1x15.ADS1115(1, ads1115_address)
+ads1115.setGain(1)
+ads1115.setMode(ads1115.MODE_SINGLE)
+logger.info("Created ADS115 instance.")
+left_line_sensor = LineSensor(AnalogIn(ads1115, 1))
+logger.info("Created left line sensor.")
+right_line_sensor = LineSensor(AnalogIn(ads1115, 3))
+logger.info("Created right line sensor.")
+sensor_array = SensorArray(izzy.sensor_y_offset,
+                           left_line_sensor,
+                           right_line_sensor)
+logger.info("Created sensor array.")
 
 # Initialize Line Follower
 line_follower = LineFollower()
 # logger.info("Created line follower/movement controller.")
-# line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+# line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION,
+# MOTOR_RATIO)
 # line_follower.pid_setup(line_sensors, 1, 0, 0)
 # line_follower.set_channels(drive_channel, turn_channel)
 # logger.info("Set movement channels.")
@@ -80,21 +90,21 @@ obstacle_responder = ObstacleResponder()
 """
 
 # Initialize OSC client to talk to Mother
-izzy = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
+izzy_udp = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
 
 # movement test
-mover = DriveMovement()
-mover.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION, MOTOR_RATIO)
+mover = DriveMovement(izzy)
 logger.info("Set movement channels.")
 mover.set_channels(drive_channel, turn_channel)
 logger.info("Sending undetectable turn command to initiate movement controls.")
-mover.turn_channel.p(1)
+mover.turn_channel.p(1)  # Kangaroo seems to need a tiny turn command before accepting drive commands
 
 
 # OSC Message Callback functions
 def follow_line_state(address: str, *args: List[Any]):
     # we expect one string argument and one speed argument
-    if not len(args) == 2 or type(args[0]) is not str or type(args[1]) is not int:
+    if not len(args) == 2 or type(args[0]) is not str or type(
+            args[1]) is not int:
         return
     if args[0] == 'start': line_follower.set_moving_state(True)
     if args[0] == 'stop': line_follower.set_moving_state(False)
@@ -109,26 +119,29 @@ def follow_line_speed(address: str, *args: List[Any]):
 
 
 def follow_line_tune(address: str, *args: List[Any]):
-    if not len(args) == 3 or type(args[0]) is not int or type(args[1]) is not int or type(args[2]) is not int:
+    if not len(args) == 3 or type(args[0]) is not int or type(
+            args[1]) is not int or type(args[2]) is not int:
         return
     line_follower.tune_pid_loop(args[0], args[1], args[2])
 
 
 def follow_line_threshold(address: str, *args: List[Any]):
-    if not len(args) == 2 or type(args[0]) is not int or type(args[1]) is not int:
+    if not len(args) == 2 or type(args[0]) is not int or type(
+            args[1]) is not int:
         return
-    line_sensors[0].threshold = args[0]
-    line_sensors[1].threshold = args[1]
+    # line_sensors[0].threshold = args[0]
+    # line_sensors[1].threshold = args[1]
 
 
 def follow_line_sensor_ranges(address: str, *args: List[Any]):
-    if not len(args) == 4 or type(args[0]) is int or type(args[1]) is not int or type(args[2]) is not int or type(
-            args[3]) is not int:
+    if not len(args) == 4 or type(args[0]) is int or type(
+            args[1]) is not int or type(args[2]) is not int or type(
+        args[3]) is not int:
         return
-    line_sensors[0].set_min_reading(args[0])
-    line_sensors[2].set_max_reading(args[1])
-    line_sensors[1].set_min_reading(args[2])
-    line_sensors[1].set_max_reading(args[3])
+    # line_sensors[0].set_min_reading(args[0])
+    # line_sensors[2].set_max_reading(args[1])
+    # line_sensors[1].set_min_reading(args[2])
+    # line_sensors[1].set_max_reading(args[3])
 
 
 def follow_line_reset_system(address: str, *args: List[Any]):
@@ -147,26 +160,31 @@ def follow_line_soft_estop(address: str, *args: List[Any]):
 # Initialize OSC message dispatcher
 osc_dispatcher = Dispatcher()
 
-
 # Assign OSC message callback functions for incoming commands
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_state)
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_speed)
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_TUNE, follow_line_tune)
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_THRESHOLD, follow_line_threshold)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES, follow_line_sensor_ranges)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_RESET_SYSTEM, follow_line_reset_system)
+osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES,
+                   follow_line_sensor_ranges)
+osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_RESET_SYSTEM,
+                   follow_line_reset_system)
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
 
 
 async def loop():
-    logger.debug("Send move command, 20 rotations at speed 20.")
-    mover.move(2, 20)
+    # logger.debug("Send move command, 20 rotations at speed 20.")
+    # mover.move(2, 20)
 
     while True:
+        logger.debug("Read line sensor2.")
+        logger.debug(f"Sensor 1 Reading: {ads1115.readADC(1)}")
+        logger.debug(f"Sensor 2 Reading: {ads1115.readADC(3)}")
         running = True
 
         # Heartbeat thread
-        # heartbeat_thread = threading.Thread(target=heartbeat, args=(in_heartbeat_message, "192.168.1.10",8080))
+        # heartbeat_thread = threading.Thread(target=heartbeat,
+        # args=(in_heartbeat_message, "192.168.1.10",8080))
         # heartbeat_thread.start()
         # heartbeat_thread.join()
 
@@ -200,13 +218,16 @@ async def loop():
         # message = message.build()
         # izzy.send(message)
 
-        await asyncio.sleep(0.2)  # sleep for a tenth of a second to let the OSC server listen for messages.
+        await asyncio.sleep(
+            0.2)  # sleep for a tenth of a second to let the OSC server
+        # listen for messages.
 
 
 async def init_main():
     # Start asynchronous OSC server
-    osc_server = AsyncIOOSCUDPServer((MY_IP_ADDRESS, Ports.OSC_RECEIVE_PORT.value),
-                                     osc_dispatcher, asyncio.get_event_loop())
+    osc_server = AsyncIOOSCUDPServer(
+        (MY_IP_ADDRESS, Ports.OSC_RECEIVE_PORT.value),
+        osc_dispatcher, asyncio.get_event_loop())
     transport, protocol = await osc_server.create_serve_endpoint()
 
     await loop()

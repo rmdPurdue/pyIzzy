@@ -59,8 +59,8 @@ class SabertoothPacketSerial:
     calculate_checksum(address: int, command: int, value: int)
         calculates the checksum for a given packet
 
-    map(source: int, from_a: int, from_b: int, to_a: int, to_b: int) -> int
-        Maps a value (source) from range from_a to to_a to the range from_b to
+    map(src: int, from_a: int, from_b: int, to_a: int, to_b: int) -> int
+        Maps a value (src) from range from_a to to_a to the range from_b to
         to_b. Returns the remapped value.
 
     Methods
@@ -181,7 +181,7 @@ class SabertoothPacketSerial:
     @staticmethod
     def map(source: int, from_a: int, from_b: int, to_a: int, to_b: int) -> int:
         """
-        Maps a value (source) from range from_a to to_a to the range from_b to to_b.
+        Maps a value (src) from range from_a to to_a to the range from_b to to_b.
 
         :param source: value to be remapped; int
         :param from_a: lowest possible value in initial range; int

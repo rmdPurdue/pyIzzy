@@ -2,6 +2,12 @@ from enum import Enum
 
 
 class Registers(Enum):
+    """
+    Using the ADS1x15-ADC library from
+    <http://github.com/chandrawi/ADS1x15-ADC> makes this class
+    unnecessary.
+    """
+
     CONVERSION = 0x00
     CONFIG = 0x01
     LO_THRESHOLD = 0x02

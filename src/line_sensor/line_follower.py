@@ -1,5 +1,5 @@
-from source.line_sensor.pid import PID
-from source.movement.drive_movement import DriveMovement
+from src.line_sensor.pid import PID
+from src.movement.drive_movement import DriveMovement
 
 
 class LineFollower(DriveMovement):

@@ -1,4 +1,4 @@
-from source.communication.heartbeat.message_type import MessageType
+from src.communication.heartbeat.message_type import MessageType
 
 
 class HeartbeatMessage:
