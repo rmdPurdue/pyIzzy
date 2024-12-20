@@ -1,5 +1,9 @@
 import math
+import socket
 
+
+# TODO: add uuid, status, and lastContact to attributes
+#  docstring.
 
 class Izzy:
     """
@@ -7,6 +11,9 @@ class Izzy:
 
     Attributes
     ----------
+    ip_address: str
+        a string representation of the IP address of the unit
+
     wheel_radius: float
         the radius of a drive wheel, in mm
 
@@ -24,9 +31,6 @@ class Izzy:
 
     motor_ratio: int
         the gearbox reduction ratio
-
-    ip_address: str
-        a string representation of the IP address of the unit
 
     line_following: boolean
         true when line_following mode is active
@@ -51,12 +55,15 @@ class Izzy:
         the resolution of the motor wheels, in encoder ticks per degree of turn
     """
 
+    uuid = None
+    ip_address = IPAddr = socket.gethostbyname(socket.gethostname())
+    status = None
+    lastContact = None
     wheel_radius = 67.3 / 2
     system_radius = 124.5
     line_sensor_y_offset = 88
     encoder_resolution = 20
     motor_ratio = 100
-    ip_address = "127.0.0.1"  # IZZY's IP; don't use local host
     line_following = False
     moving = False
     position = {"x": 0, "y": 0, "z": 0}

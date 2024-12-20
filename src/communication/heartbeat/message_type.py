@@ -9,4 +9,3 @@ class MessageType(Enum):
     BROKEN = 0x05
     OSC_COM_ERROR = 0x06
     NOT_VALID = 0x00
-    HEARTBEAT = 0x00

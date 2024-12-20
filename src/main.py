@@ -1,11 +1,18 @@
 import logging
+import socket
+import threading
+import time
+from queue import Queue
 from typing import Any, List
-
 import ADS1x15
 import serial
 from pythonosc.udp_client import SimpleUDPClient
+from src.communication.heartbeat.heartbeat_message import HeartbeatMessage
+from src.communication.heartbeat.message_type import MessageType
+from src.communication.heartbeat.server_status import MotherStatus
 from src.communication.osc_addresses import OSCAddresses
 from src.devices.client import Izzy
+from src.devices.server import Server
 from src.line_sensor.analog_input import AnalogIn
 from src.line_sensor.line_sensor import LineSensor
 from src.line_sensor.line_follower import LineFollower
@@ -14,23 +21,14 @@ from src.kangaroo.kangaroo_channel import KangarooChannel
 from pythonosc.osc_server import AsyncIOOSCUDPServer
 from pythonosc.dispatcher import Dispatcher
 import asyncio
-
 from src.line_sensor.sensor_array import SensorArray
 from src.movement.drive_movement import DriveMovement
 
-# in_heartbeat_message = Queue()
-# mother = Server()
 KANGAROO_PORT = "/dev/ttyS0"
-physical_details = {"wheel radius": 67.3 / 2,
-                    "system radius": 124.5,
-                    "sensor y offset": 88,
-                    "encoder resolution": 20,
-                    "motor ratio": 100,
-                    }
-MY_IP_ADDRESS = "127.0.0.1"  # IZZY's IP; don't use local host
-MOTHER_IP_ADDRESS = "192.168.1.1"  # Mother's IP
 ads1115_address = 0x49
 izzy = Izzy()
+mother = Server()
+heartbeat_messages = Queue()
 
 # Start logger
 logger = logging.getLogger(__name__)
@@ -68,13 +66,13 @@ left_line_sensor = LineSensor(AnalogIn(ads1115, 1))
 logger.info("Created left line sensor.")
 right_line_sensor = LineSensor(AnalogIn(ads1115, 3))
 logger.info("Created right line sensor.")
-sensor_array = SensorArray(izzy.sensor_y_offset,
+sensor_array = SensorArray(izzy.line_sensor_y_offset,
                            left_line_sensor,
                            right_line_sensor)
 logger.info("Created sensor array.")
 
 # Initialize Line Follower
-line_follower = LineFollower()
+# line_follower = LineFollower()
 # logger.info("Created line follower/movement controller.")
 # line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION,
 # MOTOR_RATIO)
@@ -89,16 +87,18 @@ line_follower = LineFollower()
 obstacle_responder = ObstacleResponder()
 """
 
-# Initialize OSC client to talk to Mother
-izzy_udp = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
-
 # movement test
 mover = DriveMovement(izzy)
 logger.info("Set movement channels.")
 mover.set_channels(drive_channel, turn_channel)
 logger.info("Sending undetectable turn command to initiate movement controls.")
-mover.turn_channel.p(1)  # Kangaroo seems to need a tiny turn command before accepting drive commands
+mover.turn_channel.p(
+    1)  # Kangaroo seems to need a tiny turn command before accepting drive
+# commands
 
+"""
+# Initialize OSC client to talk to Mother
+izzy_udp = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
 
 # OSC Message Callback functions
 def follow_line_state(address: str, *args: List[Any]):
@@ -136,12 +136,8 @@ def follow_line_threshold(address: str, *args: List[Any]):
 def follow_line_sensor_ranges(address: str, *args: List[Any]):
     if not len(args) == 4 or type(args[0]) is int or type(
             args[1]) is not int or type(args[2]) is not int or type(
-        args[3]) is not int:
+           args[3]) is not int:
         return
-    # line_sensors[0].set_min_reading(args[0])
-    # line_sensors[2].set_max_reading(args[1])
-    # line_sensors[1].set_min_reading(args[2])
-    # line_sensors[1].set_max_reading(args[3])
 
 
 def follow_line_reset_system(address: str, *args: List[Any]):
@@ -170,23 +166,32 @@ osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES,
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_RESET_SYSTEM,
                    follow_line_reset_system)
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
+"""
 
 
 async def loop():
-    # logger.debug("Send move command, 20 rotations at speed 20.")
-    # mover.move(2, 20)
+    # Heartbeat threads
+    heartbeat_processor = threading.Thread(target=process_heartbeat,
+                                           args=(heartbeat_messages,))
+    # heartbeat_processor.daemon = True
+    heartbeat_processor.start()
+
+    logger.debug("Heartbeat processor started.")
+
+    heartbeat_listener = threading.Thread(target=heartbeat,
+                                          args=(heartbeat_messages,))
+    # heartbeat_listener.daemon = True
+    heartbeat_listener.start()
+    logger.debug("Heartbeat listener started.")
+
+    heartbeat_listener.join()
+    heartbeat_processor.join()
 
     while True:
-        logger.debug("Read line sensor2.")
-        logger.debug(f"Sensor 1 Reading: {ads1115.readADC(1)}")
-        logger.debug(f"Sensor 2 Reading: {ads1115.readADC(3)}")
+        # logger.debug("Read line sensor2.")
+        # logger.debug(f"Sensor 1 Reading: {ads1115.readADC(1)}")
+        # logger.debug(f"Sensor 2 Reading: {ads1115.readADC(3)}")
         running = True
-
-        # Heartbeat thread
-        # heartbeat_thread = threading.Thread(target=heartbeat,
-        # args=(in_heartbeat_message, "192.168.1.10",8080))
-        # heartbeat_thread.start()
-        # heartbeat_thread.join()
 
         # Start listening for command messages
 
@@ -225,47 +230,58 @@ async def loop():
 
 async def init_main():
     # Start asynchronous OSC server
-    osc_server = AsyncIOOSCUDPServer(
-        (MY_IP_ADDRESS, Ports.OSC_RECEIVE_PORT.value),
-        osc_dispatcher, asyncio.get_event_loop())
-    transport, protocol = await osc_server.create_serve_endpoint()
+    # osc_server = AsyncIOOSCUDPServer(
+    # (izzy.ip_address, Ports.OSC_RECEIVE_PORT.value),
+    # osc_dispatcher, asyncio.get_event_loop())
+    # transport, protocol = await osc_server.create_serve_endpoint()
 
     await loop()
 
-    transport.close()
+    # transport.close()
 
 
-"""
-def incoming_heartbeat(incoming_message):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind(("", Ports.UDP_RECEIVE_PORT.value))
-    message = HeartbeatMessage()
+def process_heartbeat(messages):
     while True:
-        data, remote_ip = sock.recvfrom(1024)
-        mother.ip_address = remote_ip
-        if message.process_packet(data):
-            incoming_message.put(message, block=False)
+        message, address = messages.get()
+        if message.preamble == 0x10:
+            if message.msg_id == [0x68, 0x7A, 0x7A, 0x79, 0x6D, 0x65, 0x73,
+                                  0x73, 0x61, 0x67, 0x65]:  # 'izzymessage'
+                if message.message_type == MessageType.HELLO.value:
+                    logger.debug("Received a heartbeat pulse.")
+                    if mother.my_id is None:
+                        logger.debug(message.sender_id)
+                        mother.my_id = message.sender_id
+                        mother.ip_address = address[0]
+                        mother.status = MotherStatus.CONNECTED.value
+                        mother.set_last_contact()
+                        logger.debug("First pulse received. Initialized "
+                                     "Mother.")
+                        # for byte in mother.my_id:
+                        logger.debug(f"Mother uuid: {mother.my_id}")
+                        # while True:
+                            # beat.send_beat(message)
+                            # time.sleep(2)
+                    else:
+                        pass
+                else:
+                    pass
+            else:
+                pass
         else:
             pass
-        # If so, can I collect Mother UUID here, too?
-        # Can this be modified to confirm it's the correct mother?
 
 
-def heartbeat(incoming_message, ipaddress, port):
-    if not incoming_message.empty():
-        message = incoming_message.get()
-
-    # This should check for a message on in_heartbeat_message Queue
-    # and pull if message is new.
-    # should confirm how long since last message
-    # should send a reply based on current status.
-    # where is current status set?
-    beat = Client_Heartbeat(ipaddress, port)
+def heartbeat(messages):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind(('', Ports.UDP_RECEIVE_PORT.value))
+    logger.debug(f"Listening on {izzy.ip_address}")
     message = HeartbeatMessage()
     while True:
-        beat.send_beat(message)
-        time.sleep(2)
-"""
+        data, address = sock.recvfrom(1024)
+        logger.debug(f"Message received from {address[0]}")
+        message.process_packet(data)
+        messages.put((message, address))
+
 
 if __name__ == '__main__':
     asyncio.run(init_main())

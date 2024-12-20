@@ -1,4 +1,6 @@
 from enum import Enum
+
+
 class MotherStatus(Enum):
     CONNECTED = 1
     MISSING = 2
