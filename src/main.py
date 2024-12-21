@@ -4,6 +4,8 @@ import threading
 import time
 from queue import Queue
 from typing import Any, List
+from uuid import uuid4
+
 import ADS1x15
 import serial
 from pythonosc.udp_client import SimpleUDPClient
@@ -26,7 +28,7 @@ from src.movement.drive_movement import DriveMovement
 
 KANGAROO_PORT = "/dev/ttyS0"
 ads1115_address = 0x49
-izzy = Izzy()
+izzy = Izzy(uuid4(), "izzy")
 mother = Server()
 heartbeat_messages = Queue()
 
@@ -170,22 +172,17 @@ osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
 
 
 async def loop():
-    # Heartbeat threads
     heartbeat_processor = threading.Thread(target=process_heartbeat,
                                            args=(heartbeat_messages,))
-    # heartbeat_processor.daemon = True
+    heartbeat_processor.daemon = True
     heartbeat_processor.start()
-
-    logger.debug("Heartbeat processor started.")
+    logger.info("Heartbeat processor started.")
 
     heartbeat_listener = threading.Thread(target=heartbeat,
                                           args=(heartbeat_messages,))
-    # heartbeat_listener.daemon = True
+    heartbeat_listener.daemon = True
     heartbeat_listener.start()
-    logger.debug("Heartbeat listener started.")
-
-    heartbeat_listener.join()
-    heartbeat_processor.join()
+    logger.info("Heartbeat listener started.")
 
     while True:
         # logger.debug("Read line sensor2.")
@@ -244,25 +241,26 @@ def process_heartbeat(messages):
     while True:
         message, address = messages.get()
         if message.preamble == 0x10:
-            if message.msg_id == [0x68, 0x7A, 0x7A, 0x79, 0x6D, 0x65, 0x73,
-                                  0x73, 0x61, 0x67, 0x65]:  # 'izzymessage'
+            if list(message.msg_id) == [0x69, 0x7A, 0x7A, 0x79, 0x6D, 0x65,
+                                        0x73, 0x73, 0x61, 0x67, 0x65]:
                 if message.message_type == MessageType.HELLO.value:
-                    logger.debug("Received a heartbeat pulse.")
-                    if mother.my_id is None:
-                        logger.debug(message.sender_id)
+                    logger.info("Received a heartbeat pulse.")
+                    if mother.my_id is None or mother.my_id != message.sender_id:
                         mother.my_id = message.sender_id
                         mother.ip_address = address[0]
                         mother.status = MotherStatus.CONNECTED.value
                         mother.set_last_contact()
-                        logger.debug("First pulse received. Initialized "
-                                     "Mother.")
-                        # for byte in mother.my_id:
-                        logger.debug(f"Mother uuid: {mother.my_id}")
-                        # while True:
-                            # beat.send_beat(message)
-                            # time.sleep(2)
-                    else:
-                        pass
+                        logger.info("First pulse received. Initializing "
+                                    "Mother.")
+                    reply = HeartbeatMessage(MessageType.HERE.value)
+                    reply.sender_id = izzy.uuid.bytes
+                    reply.receiver_id = mother.my_id.bytes
+                    reply.set_data(izzy.build_status_message())
+                    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    sock.sendto(reply.get_message(),
+                                (mother.ip_address, Ports.UDP_RECEIVE_PORT.value))
+                    sock.close()
+                    logger.info(f"Sent reply to {mother.ip_address}.")
                 else:
                     pass
             else:
@@ -274,11 +272,11 @@ def process_heartbeat(messages):
 def heartbeat(messages):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     sock.bind(('', Ports.UDP_RECEIVE_PORT.value))
-    logger.debug(f"Listening on {izzy.ip_address}")
+    logger.info(f"Listening on {izzy.ip_address}")
     message = HeartbeatMessage()
     while True:
         data, address = sock.recvfrom(1024)
-        logger.debug(f"Message received from {address[0]}")
+        logger.info(f"Message received from {address[0]}")
         message.process_packet(data)
         messages.put((message, address))
 

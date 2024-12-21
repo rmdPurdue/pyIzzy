@@ -1,6 +1,8 @@
 import math
 import socket
 
+from src.communication.heartbeat.client_status import IZZYStatus
+
 
 # TODO: add uuid, status, and lastContact to attributes
 #  docstring.
@@ -55,6 +57,7 @@ class Izzy:
         the resolution of the motor wheels, in encoder ticks per degree of turn
     """
 
+    name = None
     uuid = None
     ip_address = IPAddr = socket.gethostbyname(socket.gethostname())
     status = None
@@ -73,6 +76,33 @@ class Izzy:
                            motor_ratio)
     turn_resolution = int(math.pi / 180 * system_radius * drive_resolution)
 
-    def __init__(self):
+    def __init__(self, uuid, name):
+        self.name = name
+        self.uuid = uuid
         self.drive_units = f"1 centimeter = {self.drive_resolution} ticks"
         self.turn_units = f"1 degree = {self.turn_resolution} ticks"
+
+    def build_status_message(self):
+        data = bytearray()
+        delimiter = ",".encode()
+
+        for byte in self.name.encode():
+            data.append(byte)
+        data.append(delimiter[0])
+        data.append(self.line_following)
+        data.append(delimiter[0])
+        for byte in self.position["x"].to_bytes(2):
+            data.append(byte)
+        data.append(delimiter[0])
+        for byte in self.position["y"].to_bytes(2):
+            data.append(byte)
+        data.append(delimiter[0])
+        for byte in self.position["z"].to_bytes(2):
+            data.append(byte)
+        data.append(delimiter[0])
+        for byte in self.heading.to_bytes(2):
+            data.append(byte)
+        data.append(delimiter[0])
+        for byte in self.speed.to_bytes(2):
+            data.append(byte)
+        return data

@@ -21,9 +21,9 @@ logger.info('Heartbeat Message')
 
 
 class HeartbeatMessage:
-    def __init__(self, message_type=MessageType.HELLO.value):
+    def __init__(self, message_type=None):
         self.preamble = 0x10
-        self.msg_id = [0x68, 0x7A, 0x7A, 0x79, 0x6D, 0x65, 0x73,
+        self.msg_id = [0x69, 0x7A, 0x7A, 0x79, 0x6D, 0x65, 0x73,
                        0x73, 0x61, 0x67, 0x65]  # 'izzymessage'
         self.msg_length = 46
         self.sender_id = None
@@ -33,13 +33,12 @@ class HeartbeatMessage:
 
     def set_data(self, data):
         self.data = data
-        self.msg_length += len(self.data)
+        if self.data is not None:
+            self.msg_length += len(self.data)
 
     def process_packet(self, raw_data):
         self.preamble = raw_data[0]
         self.msg_id = raw_data[1:12]
-        logger.debug(f"Raw data: {len(raw_data)} and int from bytes: "
-                     f"{int(raw_data[12])}")
         if len(raw_data) == int(raw_data[12]):
             self.msg_length = int(raw_data[12])
             self.sender_id = UUID(bytes=raw_data[13:29])
@@ -52,3 +51,38 @@ class HeartbeatMessage:
             return True
         else:
             return False
+
+    def get_message(self):
+        message = bytearray()
+        message.append(self.preamble)
+
+        if self.msg_id is not None:
+            for byte in self.msg_id:
+                message.append(byte)
+        else:
+            for i in range(0, 11):
+                message.append(0x00)
+
+        message.append(self.msg_length)
+
+        if self.sender_id is not None:
+            for byte in self.sender_id:
+                message.append(byte)
+        else:
+            for i in range(0, 16):
+                message.append(0x00)
+
+        if self.receiver_id is not None:
+            for byte in self.receiver_id:
+                message.append(byte)
+        else:
+            for i in range(0, 16):
+                message.append(0x00)
+
+        message.append(self.message_type)
+
+        if self.data is not None:
+            for byte in self.data:
+                message.append(byte)
+
+        return message

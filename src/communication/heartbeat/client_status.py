@@ -1,4 +1,6 @@
 from enum import Enum
+
+
 class IZZYStatus(Enum):
     MISSING = 1
     AVAILABLE = 2
