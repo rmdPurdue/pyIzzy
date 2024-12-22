@@ -257,8 +257,9 @@ def process_heartbeat(messages):
                     reply.receiver_id = mother.my_id.bytes
                     reply.set_data(izzy.build_status_message())
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                    time.sleep(1)
                     sock.sendto(reply.get_message(),
-                                (mother.ip_address, Ports.UDP_RECEIVE_PORT.value))
+                                (mother.ip_address, Ports.UDP_SEND_PORT.value))
                     sock.close()
                     logger.info(f"Sent reply to {mother.ip_address}.")
                 else:

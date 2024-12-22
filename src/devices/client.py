@@ -69,9 +69,9 @@ class Izzy:
     motor_ratio = 100
     line_following = False
     moving = False
-    position = {"x": 0, "y": 0, "z": 0}
-    heading = 0
-    speed = 0
+    position = {"x": 1, "y": 2, "z": 3}
+    heading = 4
+    speed = 5
     drive_resolution = int(math.pi * wheel_radius * 2 * encoder_resolution *
                            motor_ratio)
     turn_resolution = int(math.pi / 180 * system_radius * drive_resolution)

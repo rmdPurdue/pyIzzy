@@ -63,7 +63,7 @@ class HeartbeatMessage:
             for i in range(0, 11):
                 message.append(0x00)
 
-        message.append(self.msg_length)
+        message.extend(self.msg_length.to_bytes(1, "big"))
 
         if self.sender_id is not None:
             for byte in self.sender_id:
