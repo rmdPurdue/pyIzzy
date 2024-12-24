@@ -6,8 +6,8 @@ class LineFollower(DriveMovement):
     following_stopped = False
     moving = False
 
-    def __init__(self, x=0, y=0, z=0):
-        super().__init__(x, y, z)
+    def __init__(self, izzy):
+        super().__init__(izzy)
         self.pid = None
 
     def pid_setup(self, sensors, kp=1, ki=0, kd=0):

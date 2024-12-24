@@ -1,5 +1,6 @@
 import logging
 import socket
+import struct
 import threading
 import time
 from queue import Queue
@@ -9,6 +10,8 @@ from uuid import uuid4
 import ADS1x15
 import serial
 from pythonosc.udp_client import SimpleUDPClient
+
+from src.communication.heartbeat.client_status import IZZYStatus
 from src.communication.heartbeat.heartbeat_message import HeartbeatMessage
 from src.communication.heartbeat.message_type import MessageType
 from src.communication.heartbeat.server_status import MotherStatus
@@ -74,15 +77,9 @@ sensor_array = SensorArray(izzy.line_sensor_y_offset,
 logger.info("Created sensor array.")
 
 # Initialize Line Follower
-# line_follower = LineFollower()
-# logger.info("Created line follower/movement controller.")
-# line_follower.setup(WHEEL_RADIUS, SYSTEM_RADIUS, ENCODER_RESOLUTION,
-# MOTOR_RATIO)
-# line_follower.pid_setup(line_sensors, 1, 0, 0)
-# line_follower.set_channels(drive_channel, turn_channel)
-# logger.info("Set movement channels.")
-# line_follower.update_speed(100)
-# line_follower.start_following()
+line_follower = LineFollower(izzy)
+logger.info("Created line follower/movement controller.")
+line_follower.pid_setup(sensor_array, 1, 0, 0)
 
 """
 # Initialize Obstacle Responder
@@ -98,29 +95,29 @@ mover.turn_channel.p(
     1)  # Kangaroo seems to need a tiny turn command before accepting drive
 # commands
 
-"""
 # Initialize OSC client to talk to Mother
-izzy_udp = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
+# izzy_udp = SimpleUDPClient(MOTHER_IP_ADDRESS, Ports.OSC_SEND_PORT.value)
+
 
 # OSC Message Callback functions
 def follow_line_state(address: str, *args: List[Any]):
-    # we expect one string argument and one speed argument
-    if not len(args) == 2 or type(args[0]) is not str or type(
-            args[1]) is not int:
-        return
-    if args[0] == 'start': line_follower.set_moving_state(True)
-    if args[0] == 'stop': line_follower.set_moving_state(False)
-    line_follower.update_speed(args[1])
+    logger.debug(f"Received a message from {address} to enter line following "
+                 f"mode.")
+    izzy.status = IZZYStatus.FOLLOWING.value
+    # we expect no arguments
+    # enable line following mode (and disable other modes)
 
 
 def follow_line_speed(address: str, *args: List[Any]):
     # we expect one speed argument
     if not len(args) == 1 or type(args[0]) is not int:
         return
-    line_follower.update_speed(args[0])
+    logger.debug(f"Received a message from {address} to follow the line at "
+                 f"speed {args[0]}")
+    # line_follower.update_speed(args[0])
 
 
-def follow_line_tune(address: str, *args: List[Any]):
+"""def follow_line_tune(address: str, *args: List[Any]):
     if not len(args) == 3 or type(args[0]) is not int or type(
             args[1]) is not int or type(args[2]) is not int:
         return
@@ -152,23 +149,26 @@ def follow_line_soft_estop(address: str, *args: List[Any]):
     if not len(args) == 1 or type(args[0]) is not str:
         return
     if args[0] == 'eStop':
-        line_follower.soft_estop()
-
+        line_follower.soft_estop()"""
 
 # Initialize OSC message dispatcher
 osc_dispatcher = Dispatcher()
 
+
 # Assign OSC message callback functions for incoming commands
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_state)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_speed)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_TUNE, follow_line_tune)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_THRESHOLD, follow_line_threshold)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES,
-                   follow_line_sensor_ranges)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_RESET_SYSTEM,
-                   follow_line_reset_system)
-osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP, follow_line_soft_estop)
-"""
+osc_dispatcher.map(OSCAddresses.FOLLOW_LINE.value + OSCAddresses.ENABLE.value,
+                   follow_line_state)
+osc_dispatcher.map(OSCAddresses.FOLLOW_LINE.value + OSCAddresses.SPEED.value,
+                   follow_line_speed)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_speed)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_TUNE, follow_line_tune)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_THRESHOLD, follow_line_threshold)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES,
+# follow_line_sensor_ranges)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_RESET_SYSTEM,
+# follow_line_reset_system)
+# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SOFT_ESTOP,
+# follow_line_soft_estop)
 
 
 async def loop():
@@ -227,10 +227,10 @@ async def loop():
 
 async def init_main():
     # Start asynchronous OSC server
-    # osc_server = AsyncIOOSCUDPServer(
-    # (izzy.ip_address, Ports.OSC_RECEIVE_PORT.value),
-    # osc_dispatcher, asyncio.get_event_loop())
-    # transport, protocol = await osc_server.create_serve_endpoint()
+    osc_server = AsyncIOOSCUDPServer(
+        ("10.168.193.134", Ports.OSC_RECEIVE_PORT.value),
+        osc_dispatcher, asyncio.get_event_loop())
+    transport, protocol = await osc_server.create_serve_endpoint()
 
     await loop()
 
@@ -245,17 +245,70 @@ def process_heartbeat(messages):
                                         0x73, 0x73, 0x61, 0x67, 0x65]:
                 if message.message_type == MessageType.HELLO.value:
                     logger.info("Received a heartbeat pulse.")
-                    if mother.my_id is None or mother.my_id != message.sender_id:
+                    if (mother.my_id is None or mother.my_id !=
+                            message.sender_id):
                         mother.my_id = message.sender_id
                         mother.ip_address = address[0]
                         mother.status = MotherStatus.CONNECTED.value
                         mother.set_last_contact()
                         logger.info("First pulse received. Initializing "
                                     "Mother.")
-                    reply = HeartbeatMessage(MessageType.HERE.value)
+                    reply = HeartbeatMessage()
                     reply.sender_id = izzy.uuid.bytes
                     reply.receiver_id = mother.my_id.bytes
-                    reply.set_data(izzy.build_status_message())
+                    delimiter = ",".encode()
+                    data = izzy.build_status_message()
+                    match izzy.status:
+                        case IZZYStatus.AVAILABLE.value:
+                            reply.message_type = MessageType.HERE.value
+                        case IZZYStatus.MOVING.value:
+                            reply.message_type = MessageType.MOVING.value
+                        case IZZYStatus.FOLLOWING.value:
+                            reply.message_type = MessageType.FOLLOWING.value
+                            if izzy.status == IZZYStatus.FOLLOWING.value:
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              line_follower.pid.kp))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              line_follower.pid.ki))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              line_follower.pid.kd))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              line_follower.pid.error))
+                                data += delimiter
+                                data += bytearray(
+                                    struct.pack("f",
+                                                line_follower.pid.get_error_angle()))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              left_line_sensor.min_reading))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              left_line_sensor.max_reading))
+                                data += delimiter
+                                data += bytearray(
+                                    struct.pack("f", left_line_sensor.reading))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              right_line_sensor.min_reading))
+                                data += delimiter
+                                data += bytearray(struct.pack("f",
+                                                              right_line_sensor.min_reading))
+                                data += delimiter
+                                data += bytearray(
+                                    struct.pack("f", right_line_sensor.reading))
+
+                        case IZZYStatus.ESTOP.value:
+                            reply.message_type = MessageType.ESTOP.value
+                        case _:
+                            reply.message_type = MessageType.NOT_VALID
+                    reply.set_data(data)
+                    logger.debug(f"Message length: {reply.msg_length}")
+                    logger.debug(f"Payload length: {len(data)}")
+                    logger.debug(reply.data)
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     time.sleep(1)
                     sock.sendto(reply.get_message(),
@@ -277,7 +330,6 @@ def heartbeat(messages):
     message = HeartbeatMessage()
     while True:
         data, address = sock.recvfrom(1024)
-        logger.info(f"Message received from {address[0]}")
         message.process_packet(data)
         messages.put((message, address))
 

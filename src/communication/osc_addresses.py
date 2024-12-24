@@ -6,12 +6,36 @@ class OSCAddresses(StrEnum):
     An enumeration class for OSC address patterns used by the project.
     Extends class StrEnum from enum.
     """
+    IZZY = "/izzy"
+    MANUAL = "/izzy/manual_control"
+    FOLLOW_LINE = "/izzy/line_following"
+    AVOID_OBSTACLE = "/izzy/obstacle_avoidance"
+    TRACK_LOCATION = "/izzy/location_tracking"
 
-    FOLLOW_LINE_STATE = '/IZZY/FollowLineState'
-    FOLLOW_LINE_SPEED = '/IZZY/FollowLineSpeed'
-    FOLLOW_LINE_TUNE = '/IZZY/FollowLineTune'
-    FOLLOW_LINE_THRESHOLD = '/IZZY/FollowLineThreshold'
-    STOP_PROCESSING = '/IZZY/StopProcessing'
-    FOLLOW_LINE_RESET_SYSTEM = '/IZZY/FollowLineResetSystem'
-    FOLLOW_LINE_SOFT_ESTOP = '/IZZY/FollowLineSoftEStop'
-    FOLLOW_LINE_SET_SENSOR_RANGES = '/IZZY/FollowLineSetRanges'
+    SOFT_STOP = "/soft_stop"  # Global method {none}
+
+    # methods for MANUAL, FOLLOW_LINE, AVOID_OBSTACLE, TRACK_LOCATION
+    ENABLE = "/enable"  # {bool}
+
+    # methods for MANUAL
+    RESET = "/reset"  # {none}
+    MOVE = "/move"  # {distance: int} {optional speed: int}
+    ACCEL_TO = "/accelto"  # {speed: int}
+    ACCEL_BY = "/accelby"  # {speed: int}
+    TURN_TO = "/turnto"  # {angle: int} {optional speed: int}
+    TURN = "/turn"  # {angle: int} {optional speed: int}
+
+    # methods for FOLLOW_LINE
+    SPEED = "/speed"  # {speed: int}
+    TUNE = "/tune"  # {kp: float} {ki: float} {kd: float}
+
+    # address patterns for FOLLOW_LINE
+    SENSOR1 = "/sensor1"
+    SENSOR2 = "/sensor2"
+
+    # address patterns for SENSOR
+    THRESHOLD = "/threshold"
+
+    # methods for THRESHOLD
+    MIN = "/min"  # {minimum: int}
+    MAX = "/max"  # {maximum: int}

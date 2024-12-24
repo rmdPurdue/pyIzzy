@@ -1,5 +1,6 @@
 import math
 import socket
+import struct
 
 from src.communication.heartbeat.client_status import IZZYStatus
 
@@ -60,7 +61,7 @@ class Izzy:
     name = None
     uuid = None
     ip_address = IPAddr = socket.gethostbyname(socket.gethostname())
-    status = None
+    status = IZZYStatus.AVAILABLE.value
     lastContact = None
     wheel_radius = 67.3 / 2
     system_radius = 124.5

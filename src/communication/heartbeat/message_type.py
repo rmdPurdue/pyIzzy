@@ -6,6 +6,7 @@ class MessageType(Enum):
     HERE = 0x02
     SETUP_ERROR = 0x03
     MOVING = 0x04
-    BROKEN = 0x05
-    OSC_COM_ERROR = 0x06
-    NOT_VALID = 0x00
+    FOLLOWING = 0x05
+    ESTOP = 0x06
+    OSC_COM_ERROR = 0x07
+    NOT_VALID = 0x08
