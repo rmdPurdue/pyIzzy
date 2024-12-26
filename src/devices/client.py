@@ -68,8 +68,6 @@ class Izzy:
     line_sensor_y_offset = 88
     encoder_resolution = 20
     motor_ratio = 100
-    line_following = False
-    moving = False
     position = {"x": 1, "y": 2, "z": 3}
     heading = 4
     speed = 5
@@ -90,7 +88,7 @@ class Izzy:
         for byte in self.name.encode():
             data.append(byte)
         data.append(delimiter[0])
-        data.append(self.line_following)
+        data.append(self.status)
         data.append(delimiter[0])
         for byte in self.position["x"].to_bytes(2):
             data.append(byte)

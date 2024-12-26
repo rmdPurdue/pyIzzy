@@ -258,53 +258,51 @@ def process_heartbeat(messages):
                     reply.receiver_id = mother.my_id.bytes
                     delimiter = ",".encode()
                     data = izzy.build_status_message()
+                    reply.message_type = MessageType.HERE.value
                     match izzy.status:
                         case IZZYStatus.AVAILABLE.value:
-                            reply.message_type = MessageType.HERE.value
+                            pass
                         case IZZYStatus.MOVING.value:
-                            reply.message_type = MessageType.MOVING.value
+                            pass
                         case IZZYStatus.FOLLOWING.value:
-                            reply.message_type = MessageType.FOLLOWING.value
-                            if izzy.status == IZZYStatus.FOLLOWING.value:
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              line_follower.pid.kp))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              line_follower.pid.ki))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              line_follower.pid.kd))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              line_follower.pid.error))
-                                data += delimiter
-                                data += bytearray(
-                                    struct.pack("f",
-                                                line_follower.pid.get_error_angle()))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              left_line_sensor.min_reading))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              left_line_sensor.max_reading))
-                                data += delimiter
-                                data += bytearray(
-                                    struct.pack("f", left_line_sensor.reading))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              right_line_sensor.min_reading))
-                                data += delimiter
-                                data += bytearray(struct.pack("f",
-                                                              right_line_sensor.min_reading))
-                                data += delimiter
-                                data += bytearray(
-                                    struct.pack("f", right_line_sensor.reading))
-
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          line_follower.pid.kp))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          line_follower.pid.ki))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          line_follower.pid.kd))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          line_follower.pid.error))
+                            data += delimiter
+                            data += bytearray(
+                                struct.pack("f",
+                                            line_follower.pid.get_error_angle()))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          left_line_sensor.min_reading))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          left_line_sensor.max_reading))
+                            data += delimiter
+                            data += bytearray(
+                                struct.pack("f", left_line_sensor.reading))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          right_line_sensor.min_reading))
+                            data += delimiter
+                            data += bytearray(struct.pack("f",
+                                                          right_line_sensor.min_reading))
+                            data += delimiter
+                            data += bytearray(
+                                struct.pack("f", right_line_sensor.reading))
                         case IZZYStatus.ESTOP.value:
-                            reply.message_type = MessageType.ESTOP.value
+                            pass
                         case _:
-                            reply.message_type = MessageType.NOT_VALID
+                            pass
                     reply.set_data(data)
                     logger.debug(f"Message length: {reply.msg_length}")
                     logger.debug(f"Payload length: {len(data)}")
