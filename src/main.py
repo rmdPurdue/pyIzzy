@@ -3,6 +3,7 @@ import socket
 import struct
 import threading
 import time
+from datetime import datetime
 from queue import Queue
 from typing import Any, List
 from uuid import uuid4
@@ -104,8 +105,7 @@ def follow_line_state(address: str, *args: List[Any]):
     logger.debug(f"Received a message from {address} to enter line following "
                  f"mode.")
     izzy.status = IZZYStatus.FOLLOWING.value
-    # we expect no arguments
-    # enable line following mode (and disable other modes)
+    # TODO: Disable other modes
 
 
 def follow_line_speed(address: str, *args: List[Any]):
@@ -114,17 +114,20 @@ def follow_line_speed(address: str, *args: List[Any]):
         return
     logger.debug(f"Received a message from {address} to follow the line at "
                  f"speed {args[0]}")
-    # line_follower.update_speed(args[0])
+    # TODO: send the speed message
 
 
-"""def follow_line_tune(address: str, *args: List[Any]):
-    if not len(args) == 3 or type(args[0]) is not int or type(
-            args[1]) is not int or type(args[2]) is not int:
+def follow_line_tune(address: str, *args: List[Any]):
+    if not len(args) == 3 or type(args[0]) is not float or type(
+            args[1]) is not float or type(args[2]) is not float:
         return
     line_follower.tune_pid_loop(args[0], args[1], args[2])
+    logger.debug(f"Received a message from {address} to update the line "
+                 f"following PID tuning to Kp = {args[0]}, Ki = {args[1]}, "
+                 f"and Kd = {args[2]}")
 
 
-def follow_line_threshold(address: str, *args: List[Any]):
+"""def follow_line_threshold(address: str, *args: List[Any]):
     if not len(args) == 2 or type(args[0]) is not int or type(
             args[1]) is not int:
         return
@@ -161,7 +164,8 @@ osc_dispatcher.map(OSCAddresses.FOLLOW_LINE.value + OSCAddresses.ENABLE.value,
 osc_dispatcher.map(OSCAddresses.FOLLOW_LINE.value + OSCAddresses.SPEED.value,
                    follow_line_speed)
 # osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SPEED, follow_line_speed)
-# osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_TUNE, follow_line_tune)
+osc_dispatcher.map(OSCAddresses.FOLLOW_LINE + OSCAddresses.TUNE,
+                   follow_line_tune)
 # osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_THRESHOLD, follow_line_threshold)
 # osc_dispatcher.map(OSCAddresses.FOLLOW_LINE_SET_SENSOR_RANGES,
 # follow_line_sensor_ranges)
@@ -244,15 +248,14 @@ def process_heartbeat(messages):
             if list(message.msg_id) == [0x69, 0x7A, 0x7A, 0x79, 0x6D, 0x65,
                                         0x73, 0x73, 0x61, 0x67, 0x65]:
                 if message.message_type == MessageType.HELLO.value:
-                    logger.info("Received a heartbeat pulse.")
+                    # logger.info("Received a heartbeat pulse.")
                     if (mother.my_id is None or mother.my_id !=
                             message.sender_id):
                         mother.my_id = message.sender_id
                         mother.ip_address = address[0]
                         mother.status = MotherStatus.CONNECTED.value
                         mother.set_last_contact()
-                        logger.info("First pulse received. Initializing "
-                                    "Mother.")
+                        # logger.info("First pulse received. Initializing Mother.")
                     reply = HeartbeatMessage()
                     reply.sender_id = izzy.uuid.bytes
                     reply.receiver_id = mother.my_id.bytes
@@ -304,15 +307,11 @@ def process_heartbeat(messages):
                         case _:
                             pass
                     reply.set_data(data)
-                    logger.debug(f"Message length: {reply.msg_length}")
-                    logger.debug(f"Payload length: {len(data)}")
-                    logger.debug(reply.data)
                     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
                     time.sleep(1)
                     sock.sendto(reply.get_message(),
                                 (mother.ip_address, Ports.UDP_SEND_PORT.value))
                     sock.close()
-                    logger.info(f"Sent reply to {mother.ip_address}.")
                 else:
                     pass
             else:
@@ -330,6 +329,10 @@ def heartbeat(messages):
         data, address = sock.recvfrom(1024)
         message.process_packet(data)
         messages.put((message, address))
+        # TODO: heartbeat loss and recovery.
+        # if no heartbeat in set interval, lock down motors
+        # wait for unlock message to arrive or hard reset?
+        # what does recovery from heartbeat loss look like?
 
 
 if __name__ == '__main__':
